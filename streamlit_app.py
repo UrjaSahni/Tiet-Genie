@@ -1,84 +1,116 @@
-import os
-import tempfile
-import traceback
 import streamlit as st
-
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
-from langchain_together import ChatTogether
 from dotenv import load_dotenv
-load_dotenv()
+from langchain.document_loaders import PyPDFLoader
+from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+from langchain.chat_models import ChatOpenAI
+import os
 
+# Load environment variables
+def load_env():
+    load_dotenv()
 
-# Load API key safely
-together_api_key = os.getenv("TOGETHER_API_KEY")
+# Initialize embeddings model
+EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
+EMBEDDINGS = SentenceTransformerEmbeddings(model_name=EMBEDDING_MODEL)
 
+@st.cache_resource
+# Create or load FAISS stores for all provided PDF paths
+def init_vectorstores(pdf_paths):
+    stores = {}
+    for path in pdf_paths:
+        loader = PyPDFLoader(path)
+        docs = loader.load_and_split()
+        store = FAISS.from_documents(docs, EMBEDDINGS)
+        stores[path] = store
+    return stores
 
+# Initialize session state
+if 'pdf_paths' not in st.session_state:
+    # Keep these two PDFs loaded by default
+    st.session_state.pdf_paths = ['rules.pdf', 'Transformers-II-Encoders.pdf']
 
-# Streamlit page setup
-st.set_page_config(page_title="PDF Chatbot", layout="centered")
-st.title("📚 Tiet-Genie")
-st.markdown("Ask questions based on uploaded PDFs using HuggingFace Embeddings + Together LLM.")
+if 'vectorstores' not in st.session_state:
+    st.session_state.vectorstores = init_vectorstores(st.session_state.pdf_paths)
 
-# Upload PDFs
-uploaded_files = st.file_uploader("Upload one or more PDFs", type=["pdf"], accept_multiple_files=True)
+if 'memory' not in st.session_state:
+    # Conversation memory to handle long-term context
+    st.session_state.memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
 
-if uploaded_files:
-    all_docs = []
+if 'chain' not in st.session_state:
+    st.session_state.chain = None
 
-    for uploaded_file in uploaded_files:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            tmp_path = tmp_file.name
+# Page config
+st.set_page_config(page_title='PDF Chatbot', layout='wide')
 
-        loader = PyPDFLoader(tmp_path)
-        documents = loader.load()
-        all_docs.extend(documents)
+# Sidebar: select which PDF to chat with
+def select_pdf():
+    return st.sidebar.selectbox('Select a PDF to query', st.session_state.pdf_paths)
 
-    # Split and embed
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    split_docs = text_splitter.split_documents(all_docs)
+selected_pdf = select_pdf()
 
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vectorstore = FAISS.from_documents(split_docs, embeddings)
+# Display chat history
+st.header(f'Chatting with: {os.path.basename(selected_pdf)}')
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+for msg in st.session_state.messages:
+    if msg['role'] == 'user':
+        st.chat_message('user').write(msg['content'])
+    else:
+        st.chat_message('assistant').write(msg['content'])
 
-    # Retriever and LLM
-    retriever = vectorstore.as_retriever(
-        search_type="mmr",  # You can change to "similarity" if needed
-        search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
-    )
+# Chat input (above PDF uploader)
+query = st.chat_input('Your question:')
+if query:
+    st.session_state.messages.append({'role': 'user', 'content': query})
 
-    llm = ChatTogether(
-    model="deepseek-ai/DeepSeek-V3",
-    temperature=0.2,
-    together_api_key=together_api_key  # pass key explicitly
-)
+    # Retrieve chain for selected PDF
+    retriever = st.session_state.vectorstores[selected_pdf].as_retriever(search_kwargs={'k': 3})
+    if st.session_state.chain is None:
+        llm = ChatOpenAI(temperature=0)
+        st.session_state.chain = ConversationalRetrievalChain.from_llm(
+            llm,
+            retriever,
+            memory=st.session_state.memory,
+            return_source_documents=True
+        )
+    else:
+        # update retriever dynamically
+        st.session_state.chain.retriever = retriever
 
+    # Run the chain
+    result = st.session_state.chain({'question': query})
+    answer = result['answer']
+    docs = result.get('source_documents', [])
 
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=retriever,
-        return_source_documents=True
-    )
+    # Build source references
+    refs = []
+    for d in docs:
+        meta = d.metadata
+        page = meta.get('page') or meta.get('page_number') or 'Unknown'
+        src = os.path.basename(meta.get('source', selected_pdf))
+        # Generate a link to the PDF (download button)
+        link = f"{src}#page={page}"  # Anchor link format
+        refs.append(f"[Source: {src}, page {page}]({link})")
+    ref_text = "\n".join(refs)
 
-    # Ask a question
-    query = st.text_input("❓ Ask a question from the PDFs:")
-    if query:
-        try:
-            with st.spinner("Thinking..."):
-                result = qa_chain(query)
-                clean_result = result["result"].replace("**", "")
-                st.success("✅ Answer:")
-                st.write(clean_result)
+    full = f"{answer}\n\n{ref_text}"
+    st.session_state.messages.append({'role': 'assistant', 'content': full})
+    st.chat_message('assistant').write(full)
 
-                with st.expander("📖 Source Snippets"):
-                    for i, doc in enumerate(result["source_documents"]):
-                        snippet = doc.page_content.replace("**", "")
-                        st.markdown(f"**Snippet {i+1}:** {snippet[:500]}...")
-        except Exception as e:
-            st.error(f" Error: {str(e)}")
-            st.text(traceback.format_exc())
-
+# PDF uploader at the bottom
+delimiter = st.markdown('---')
+uploaded = st.file_uploader('Upload new PDF(s)', type=['pdf'], accept_multiple_files=True)
+if uploaded:
+    for up in uploaded:
+        # Save to disk
+        with open(up.name, 'wb') as f:
+            f.write(up.getbuffer())
+        st.session_state.pdf_paths.append(up.name)
+    # Rebuild vectorstores with new files
+    st.session_state.vectorstores = init_vectorstores(st.session_state.pdf_paths)
+    # Reset chain to reinitialize with updated PDFs
+    st.session_state.chain = None
+    st.experimental_rerun()
