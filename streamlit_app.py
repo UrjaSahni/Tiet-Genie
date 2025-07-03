@@ -65,7 +65,12 @@ if query:
     retriever = st.session_state.vectorstores[selected_pdf].as_retriever(search_kwargs={'k': 3})
     if st.session_state.chain is None:
         together_key = os.getenv('TOGETHER_API_KEY') or os.getenv('TOGETHER_KEY')
-        llm = ChatTogether(model='deepseek', together_api_key=together_key, temperature=0)
+        # Instantiate Together chat model using the correct parameter name for API key
+llm = ChatTogether(
+    model='deepseek',
+    temperature=0,
+    api_key=together_key
+)
         st.session_state.chain = ConversationalRetrievalChain.from_llm(
             llm,
             retriever,
