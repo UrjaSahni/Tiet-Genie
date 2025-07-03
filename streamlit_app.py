@@ -30,7 +30,7 @@ def init_vectorstores(pdf_paths):
 # Initialize session state
 if 'pdf_paths' not in st.session_state:
     # Keep these two PDFs loaded by default
-    st.session_state.pdf_paths = ['rules.pdf', 'Transformers-II-Encoders.pdf']
+    st.session_state.pdf_paths = ['rules.pdf', 'Sequence Models-I.pdf']
 
 if 'vectorstores' not in st.session_state:
     st.session_state.vectorstores = init_vectorstores(st.session_state.pdf_paths)
