@@ -6,7 +6,6 @@ from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-# Import ChatTogether from langchain-together integration
 from langchain_together import ChatTogether
 
 # Load environment variables for Together API key
@@ -66,11 +65,11 @@ if query:
     if st.session_state.chain is None:
         together_key = os.getenv('TOGETHER_API_KEY') or os.getenv('TOGETHER_KEY')
         # Instantiate Together chat model using the correct parameter name for API key
-llm = ChatTogether(
-    model='deepseek',
-    temperature=0,
-    api_key=together_key
-)
+        llm = ChatTogether(
+            model='deepseek',
+            temperature=0,
+            api_key=together_key
+        )
         st.session_state.chain = ConversationalRetrievalChain.from_llm(
             llm,
             retriever,
