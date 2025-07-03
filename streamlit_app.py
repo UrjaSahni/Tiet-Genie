@@ -6,16 +6,19 @@ from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-# Correct import for TogetherAI
-from langchain.chat_models.together import TogetherAI
+# Import ChatTogether from langchain-together integration
+from langchain_together import ChatTogether
 
 # Load environment variables for Together API key
 load_dotenv()
 
+# Initialize embeddings model
+EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
+EMBEDDINGS = SentenceTransformerEmbeddings(model_name=EMBEDDING_MODEL)
+
+@st.cache_resource
+# Create or load FAISS stores for all provided PDF paths
 def init_vectorstores(pdf_paths):
-    """
-    Create or load FAISS stores for all provided PDF paths.
-    """
     stores = {}
     for path in pdf_paths:
         loader = PyPDFLoader(path)
@@ -23,10 +26,6 @@ def init_vectorstores(pdf_paths):
         store = FAISS.from_documents(docs, EMBEDDINGS)
         stores[path] = store
     return stores
-
-# Initialize embeddings model
-EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
-EMBEDDINGS = SentenceTransformerEmbeddings(model_name=EMBEDDING_MODEL)
 
 # Initialize session state defaults
 if 'pdf_paths' not in st.session_state:
@@ -66,7 +65,7 @@ if query:
     retriever = st.session_state.vectorstores[selected_pdf].as_retriever(search_kwargs={'k': 3})
     if st.session_state.chain is None:
         together_key = os.getenv('TOGETHER_API_KEY') or os.getenv('TOGETHER_KEY')
-        llm = TogetherAI(model='deepseek', together_api_key=together_key, temperature=0)
+        llm = ChatTogether(model='deepseek', together_api_key=together_key, temperature=0)
         st.session_state.chain = ConversationalRetrievalChain.from_llm(
             llm,
             retriever,
