@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from dotenv import load_dotenv
 from langchain.document_loaders import PyPDFLoader
@@ -5,12 +6,10 @@ from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain.chat_models import ChatOpenAI
-import os
+from langchain.chat_models import TogetherAI
 
-# Load environment variables
-def load_env():
-    load_dotenv()
+# Load environment variables for Together API key
+load_dotenv()
 
 # Initialize embeddings model
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
@@ -36,7 +35,6 @@ if 'vectorstores' not in st.session_state:
     st.session_state.vectorstores = init_vectorstores(st.session_state.pdf_paths)
 
 if 'memory' not in st.session_state:
-    # Conversation memory to handle long-term context
     st.session_state.memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
 
 if 'chain' not in st.session_state:
@@ -69,7 +67,8 @@ if query:
     # Retrieve chain for selected PDF
     retriever = st.session_state.vectorstores[selected_pdf].as_retriever(search_kwargs={'k': 3})
     if st.session_state.chain is None:
-        llm = ChatOpenAI(temperature=0)
+        together_key = os.getenv('TOGETHER_API_KEY') or os.getenv('TOGETHER_KEY')
+        llm = TogetherAI(model='deepseek', together_api_key=together_key, temperature=0)
         st.session_state.chain = ConversationalRetrievalChain.from_llm(
             llm,
             retriever,
@@ -77,7 +76,6 @@ if query:
             return_source_documents=True
         )
     else:
-        # update retriever dynamically
         st.session_state.chain.retriever = retriever
 
     # Run the chain
@@ -91,8 +89,7 @@ if query:
         meta = d.metadata
         page = meta.get('page') or meta.get('page_number') or 'Unknown'
         src = os.path.basename(meta.get('source', selected_pdf))
-        # Generate a link to the PDF (download button)
-        link = f"{src}#page={page}"  # Anchor link format
+        link = f"{src}#page={page}"
         refs.append(f"[Source: {src}, page {page}]({link})")
     ref_text = "\n".join(refs)
 
@@ -105,12 +102,9 @@ delimiter = st.markdown('---')
 uploaded = st.file_uploader('Upload new PDF(s)', type=['pdf'], accept_multiple_files=True)
 if uploaded:
     for up in uploaded:
-        # Save to disk
         with open(up.name, 'wb') as f:
             f.write(up.getbuffer())
         st.session_state.pdf_paths.append(up.name)
-    # Rebuild vectorstores with new files
     st.session_state.vectorstores = init_vectorstores(st.session_state.pdf_paths)
-    # Reset chain to reinitialize with updated PDFs
     st.session_state.chain = None
     st.experimental_rerun()
