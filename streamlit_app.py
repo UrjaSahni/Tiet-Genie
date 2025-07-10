@@ -83,6 +83,19 @@ def load_default_vectorstore():
 
 vector_store = load_default_vectorstore()
 
+# ---------------- LLM + RETRIEVER ----------------
+retriever = vector_store.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
+)
+
+llm = ChatTogether(
+    model="deepseek-ai/DeepSeek-V3",
+    temperature=0.2,
+    together_api_key=together_api_key
+)
+
+
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
@@ -142,18 +155,6 @@ if uploaded_files:
             st.markdown(summary)
 
 
-
-# ---------------- LLM + RETRIEVER ----------------
-retriever = vector_store.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
-)
-
-llm = ChatTogether(
-    model="deepseek-ai/DeepSeek-V3",
-    temperature=0.2,
-    together_api_key=together_api_key
-)
 
 
 # ---------------- CHAT HISTORY ----------------
