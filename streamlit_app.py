@@ -135,7 +135,7 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 {user_prompt}
 """
 
-                # 🚫 Removed the prompt display from UI
+                # ❌ Prompt visibility removed
 
                 # Step 4: Get clean LLM response
                 response_obj = llm.invoke(prompt_to_llm)
