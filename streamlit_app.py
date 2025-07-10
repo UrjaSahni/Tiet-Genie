@@ -14,7 +14,6 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# ✅ Background image with overlay
 def set_bg_with_overlay(image_path):
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
@@ -80,7 +79,6 @@ if uploaded_files:
     new_chunks = splitter.split_documents(new_docs)
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     new_vs = FAISS.from_documents(new_chunks, embed)
-
     vector_store.merge_from(new_vs)
 
 # ---------------- LLM + RETRIEVER ----------------
@@ -137,9 +135,7 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 {user_prompt}
 """
 
-                # Show prompt if needed
-                with st.expander("🔍 Prompt sent to LLM"):
-                    st.code(prompt_to_llm)
+                # 🚫 Removed the prompt display from UI
 
                 # Step 4: Get clean LLM response
                 response_obj = llm.invoke(prompt_to_llm)
