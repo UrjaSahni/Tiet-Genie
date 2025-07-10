@@ -109,7 +109,7 @@ if not st.session_state.greeted and not st.session_state.chat_history:
 # ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
-        st.write(msg["message"])
+        st.markdown(msg["message"], unsafe_allow_html=True)
 
 user_prompt = st.chat_input("Ask something about TIET or the lecture notes...")
 if user_prompt:
@@ -120,13 +120,15 @@ if user_prompt:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                # 🔍 Custom RAG Prompt
+                # Step 1: Retrieve documents
                 retrieved_docs = retriever.get_relevant_documents(user_prompt)
 
+                # Step 2: Prepare context from retrieved docs
                 context_text = "\n\n".join([
                     f"[Page {doc.metadata.get('page', '?')}] {doc.page_content.strip()}" for doc in retrieved_docs
                 ])
 
+                # Step 3: Construct the prompt
                 prompt_to_llm = f"""
 You are an AI assistant for Thapar Institute. Use the following document snippets to answer the question. Be specific and cite relevant details.
 
@@ -137,14 +139,26 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 {user_prompt}
 """
 
-                # ✅ Show the full prompt in an expandable section
+                # Optional: Show prompt in expander
                 with st.expander("🔍 Prompt sent to LLM"):
                     st.code(prompt_to_llm)
 
-                response = llm.invoke(prompt_to_llm)
+                # Step 4: Get LLM response
+                response = llm.invoke(prompt_to_llm).strip()
+
+                # Step 5: Format source snippets
+                source_section = "\n\n---\n\n**📄 Source Snippets:**\n"
+                for i, doc in enumerate(retrieved_docs, 1):
+                    page = doc.metadata.get("page", "?")
+                    snippet = doc.page_content.strip().replace("\n", " ")[:300]
+                    source_section += f"- **Snippet {i} (Page {page})**: {snippet}\n"
+
+                # Step 6: Show response + source
+                final_response = f"{response}\n{source_section}"
+                st.markdown(final_response, unsafe_allow_html=True)
+                st.session_state.chat_history.append({"role": "assistant", "message": final_response})
 
             except Exception as e:
-                response = f"⚠️ Error: {str(e)}"
-
-        st.write(response)
-        st.session_state.chat_history.append({"role": "assistant", "message": response})
+                error_response = f"⚠️ Error: {str(e)}"
+                st.markdown(error_response)
+                st.session_state.chat_history.append({"role": "assistant", "message": error_response})
