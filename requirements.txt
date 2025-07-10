@@ -6,4 +6,5 @@ faiss-cpu
 sentence-transformers
 pypdf
 python-dotenv
-fpdf==1.7.2
+fpdf2
+
