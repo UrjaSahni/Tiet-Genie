@@ -22,51 +22,53 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# Dark Mode Toggle
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
+# Dark mode toggle
+dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
 
-with st.sidebar:
-    st.toggle("🌙 Dark Mode", key="dark_mode")
-
-def apply_theme():
-    if st.session_state.dark_mode:
-        bg_color = "#2e2e2e"
-        overlay_color = "rgba(30, 30, 30, 0.95)"
-        text_color = "#f1f1f1"
+def apply_custom_theme(dark_mode):
+    if dark_mode:
+        st.markdown("""
+        <style>
+        .main > div:has(.block-container) {
+            background-color: #1e1e1e !important;
+        }
+        .block-container {
+            color: #ffffff;
+        }
+        .stChatMessageContent, .stMarkdown, .stTextInput, .stTextArea, .stButton, .stDownloadButton {
+            color: #ffffff !important;
+        }
+        .stChatInputContainer, .stTextInput > div > input {
+            background-color: #2c2c2c !important;
+            color: white !important;
+        }
+        .stDownloadButton button {
+            background-color: #333 !important;
+            color: #fff !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
     else:
-        bg_color = "#ffffff"
-        overlay_color = "rgba(255, 255, 255, 0.82)"
-        text_color = "#111111"
+        st.markdown("""
+        <style>
+        .main > div:has(.block-container) {
+            background-color: #f8f9fa;
+        }
+        .block-container {
+            color: #000000;
+        }
+        .stChatMessageContent, .stMarkdown, .stTextInput, .stTextArea, .stButton, .stDownloadButton {
+            color: #000000 !important;
+        }
+        .stChatInputContainer, .stTextInput > div > input {
+            background-color: #ffffff !important;
+            color: black !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <style>
-    .main > div:has(.block-container) {{
-        background: {bg_color};
-        background-size: cover;
-        position: relative;
-    }}
-    .main > div:has(.block-container)::before {{
-        content: "";
-        background-color: {overlay_color};
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        z-index: 0;
-    }}
-    .block-container {{
-        position: relative;
-        z-index: 1;
-        color: {text_color};
-    }}
-    .stChatMessageContent, .stMarkdown {{
-        color: {text_color} !important;
-        font-weight: 500;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-
-apply_theme()
+# Apply dark or light mode theme
+apply_custom_theme(dark_mode)
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
