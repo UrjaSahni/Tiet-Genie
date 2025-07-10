@@ -8,6 +8,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_together import ChatTogether
+from fpdf import FPDF
+import io
 
 # ---------------- SETUP ----------------
 load_dotenv()
@@ -135,8 +137,6 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 {user_prompt}
 """
 
-                # ❌ Prompt visibility removed
-
                 # Step 4: Get clean LLM response
                 response_obj = llm.invoke(prompt_to_llm)
                 response = response_obj.content.strip() if hasattr(response_obj, "content") else str(response_obj).strip()
@@ -157,3 +157,42 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 error_response = f"⚠️ Error: {str(e)}"
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
+
+# ---------------- EXPORT CHAT HISTORY ----------------
+def export_chat_history():
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 💬 Export Chat")
+
+    chat_text = ""
+    for msg in st.session_state.chat_history:
+        role = "👩‍💻 You" if msg["role"] == "user" else "🤖 Tiet-Genie"
+        chat_text += f"{role}:\n{msg['message']}\n\n"
+
+    st.sidebar.download_button(
+        label="⬇️ Download as .txt",
+        data=chat_text,
+        file_name="chat_history.txt",
+        mime="text/plain"
+    )
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
+
+    for msg in st.session_state.chat_history:
+        role = "You" if msg["role"] == "user" else "Tiet-Genie"
+        pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
+
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+
+    st.sidebar.download_button(
+        label="⬇️ Download as .pdf",
+        data=pdf_buffer,
+        file_name="chat_history.pdf",
+        mime="application/pdf"
+    )
+
+export_chat_history()
