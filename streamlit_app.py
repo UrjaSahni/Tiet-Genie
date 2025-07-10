@@ -7,7 +7,6 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
 from langchain_together import ChatTogether
 
 # ---------------- SETUP ----------------
@@ -15,7 +14,7 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# ✅ Background image
+# ✅ Background image with overlay
 def set_bg_with_overlay(image_path):
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
@@ -82,12 +81,12 @@ if uploaded_files:
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     new_vs = FAISS.from_documents(new_chunks, embed)
 
-    # Merge into one vector store
+    # Merge user docs into main vector store
     vector_store.merge_from(new_vs)
 
-# ---------------- RAG + LLM SETUP ----------------
+# ---------------- LLM + RETRIEVER ----------------
 retriever = vector_store.as_retriever(
-    search_type="mmr",  # Maximal Marginal Relevance for diversity
+    search_type="mmr",
     search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
 )
 
@@ -97,13 +96,7 @@ llm = ChatTogether(
     together_api_key=together_api_key
 )
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    return_source_documents=True
-)
-
-# ---------------- CHAT STATE ----------------
+# ---------------- CHAT HISTORY ----------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "greeted" not in st.session_state:
@@ -127,9 +120,31 @@ if user_prompt:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                result = qa_chain({"query": user_prompt})
-                response = result["result"]
+                # 🔍 Custom RAG Prompt
+                retrieved_docs = retriever.get_relevant_documents(user_prompt)
+
+                context_text = "\n\n".join([
+                    f"[Page {doc.metadata.get('page', '?')}] {doc.page_content.strip()}" for doc in retrieved_docs
+                ])
+
+                prompt_to_llm = f"""
+You are an AI assistant for Thapar Institute. Use the following document snippets to answer the question. Be specific and cite relevant details.
+
+--- DOCUMENTS ---
+{context_text}
+
+--- QUESTION ---
+{user_prompt}
+"""
+
+                # ✅ Show the full prompt in an expandable section
+                with st.expander("🔍 Prompt sent to LLM"):
+                    st.code(prompt_to_llm)
+
+                response = llm.invoke(prompt_to_llm)
+
             except Exception as e:
                 response = f"⚠️ Error: {str(e)}"
+
         st.write(response)
         st.session_state.chat_history.append({"role": "assistant", "message": response})
