@@ -22,52 +22,71 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# Dark mode toggle
 dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
 
 def apply_custom_theme(dark_mode):
     if dark_mode:
         st.markdown("""
         <style>
+        /* Background + Text */
         .main > div:has(.block-container) {
             background-color: #1e1e1e !important;
         }
-        .block-container {
-            color: #ffffff;
-        }
-        .stChatMessageContent, .stMarkdown, .stTextInput, .stTextArea, .stButton, .stDownloadButton {
+        .block-container, .stTextInput, .stTextArea, .stMarkdown, .stChatMessageContent {
             color: #ffffff !important;
         }
-        .stChatInputContainer, .stTextInput > div > input {
+
+        /* Input background + text */
+        input, textarea, .stTextInput input {
+            background-color: #333 !important;
+            color: white !important;
+        }
+
+        /* Chat input */
+        .stChatInputContainer {
             background-color: #2c2c2c !important;
             color: white !important;
         }
+
+        /* Download buttons */
         .stDownloadButton button {
             background-color: #333 !important;
-            color: #fff !important;
+            color: white !important;
+            border: 1px solid white;
         }
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <style>
-        .main > div:has(.block-container) {
-            background-color: #f8f9fa;
+
+        /* Icons + spacing */
+        svg {
+            fill: white !important;
         }
-        .block-container {
-            color: #000000;
+
+        /* Assistant message background (optional) */
+        .stChatMessage.stChatMessage--assistant {
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            padding: 1rem;
         }
-        .stChatMessageContent, .stMarkdown, .stTextInput, .stTextArea, .stButton, .stDownloadButton {
-            color: #000000 !important;
-        }
-        .stChatInputContainer, .stTextInput > div > input {
-            background-color: #ffffff !important;
-            color: black !important;
+
+        .stChatMessage.stChatMessage--user {
+            background-color: #333;
+            border-radius: 10px;
+            padding: 1rem;
         }
         </style>
         """, unsafe_allow_html=True)
 
-# Apply dark or light mode theme
+    else:
+        st.markdown("""
+        <style>
+        .main > div:has(.block-container) {
+            background-color: #f9f9f9 !important;
+        }
+        .block-container, .stMarkdown, .stChatMessageContent {
+            color: #111 !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
 apply_custom_theme(dark_mode)
 
 # ---------------- SIDEBAR ----------------
