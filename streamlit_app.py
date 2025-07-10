@@ -81,7 +81,6 @@ if uploaded_files:
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     new_vs = FAISS.from_documents(new_chunks, embed)
 
-    # Merge user docs into main vector store
     vector_store.merge_from(new_vs)
 
 # ---------------- LLM + RETRIEVER ----------------
@@ -102,7 +101,6 @@ if "chat_history" not in st.session_state:
 if "greeted" not in st.session_state:
     st.session_state.greeted = False
 
-# ---------------- GREETING ----------------
 if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
 
@@ -139,12 +137,13 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 {user_prompt}
 """
 
-                # Optional: Show prompt in expander
+                # Show prompt if needed
                 with st.expander("🔍 Prompt sent to LLM"):
                     st.code(prompt_to_llm)
 
-                # Step 4: Get LLM response
-                response = llm.invoke(prompt_to_llm).strip()
+                # Step 4: Get clean LLM response
+                response_obj = llm.invoke(prompt_to_llm)
+                response = response_obj.content.strip() if hasattr(response_obj, "content") else str(response_obj).strip()
 
                 # Step 5: Format source snippets
                 source_section = "\n\n---\n\n**📄 Source Snippets:**\n"
@@ -153,7 +152,7 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                     snippet = doc.page_content.strip().replace("\n", " ")[:300]
                     source_section += f"- **Snippet {i} (Page {page})**: {snippet}\n"
 
-                # Step 6: Show response + source
+                # Step 6: Combine and display
                 final_response = f"{response}\n{source_section}"
                 st.markdown(final_response, unsafe_allow_html=True)
                 st.session_state.chat_history.append({"role": "assistant", "message": final_response})
