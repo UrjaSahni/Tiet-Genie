@@ -7,4 +7,6 @@ sentence-transformers
 pypdf
 python-dotenv
 fpdf2
+python-pptx
+
 
