@@ -61,7 +61,7 @@ with st.sidebar:
     st.markdown("## 🤖 Tiet-Genie")
     st.markdown("How can I assist you today? 😊")
     uploaded_files = st.file_uploader(
-        "📌 Upload PDFs, DOCX, PPTX, TXT, or MD",
+        "📎 Upload PDFs, DOCX, PPTX, TXT, or MD",
         type=["pdf", "docx", "pptx", "txt", "md"],
         accept_multiple_files=True
     )
@@ -82,18 +82,6 @@ def load_default_vectorstore():
 
 
 vector_store = load_default_vectorstore()
-
-# ---------------- LLM + RETRIEVER ----------------
-retriever = vector_store.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
-)
-
-llm = ChatTogether(
-    model="deepseek-ai/DeepSeek-V3",
-    temperature=0.2,
-    together_api_key=together_api_key
-)
 
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
@@ -118,20 +106,31 @@ def load_file_to_docs(file_path, ext):
 
 if uploaded_files:
     new_docs = []
-    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
     for f in uploaded_files:
         ext = f.name.split(".")[-1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
             tmp.write(f.read())
             tmp_path = tmp.name
+        new_docs.extend(load_file_to_docs(tmp_path, ext))
 
-        docs = load_file_to_docs(tmp_path, ext)
-        new_docs.extend(docs)
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        chunks = splitter.split_documents(docs)
-        new_vs = FAISS.from_documents(chunks, embed)
-        vector_store.merge_from(new_vs)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    new_chunks = splitter.split_documents(new_docs)
+    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    new_vs = FAISS.from_documents(new_chunks, embed)
+    vector_store.merge_from(new_vs)
+
+
+# ---------------- LLM + RETRIEVER ----------------
+retriever = vector_store.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
+)
+
+llm = ChatTogether(
+    model="deepseek-ai/DeepSeek-V3",
+    temperature=0.2,
+    together_api_key=together_api_key
+)
 
 
 # ---------------- CHAT HISTORY ----------------
@@ -219,7 +218,7 @@ def export_chat_history():
         txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
     txt_buffer.seek(0)
 
-    st.sidebar.markdown("### 📄 Export Chat History")
+    st.sidebar.markdown("### 📤 Export Chat History")
     st.sidebar.download_button(
         "⬇️ Download as .pdf",
         data=pdf_buffer,
@@ -228,7 +227,7 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),
+        data=txt_buffer.getvalue(),  # ✅ Fix applied here
         file_name="chat_history.txt",
         mime="text/plain"
     )
