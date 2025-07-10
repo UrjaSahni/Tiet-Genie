@@ -8,5 +8,20 @@ pypdf
 python-dotenv
 fpdf2
 python-pptx
+streamlit
+python-docx
+python-pptx
+fpdf
+python-dotenv
+Pillow
+langchain
+langchain-community
+langchain-together
+faiss-cpu
+sentence-transformers
+unstructured
+transformers
+torch
+
 
 
