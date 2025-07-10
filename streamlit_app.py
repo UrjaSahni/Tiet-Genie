@@ -1,15 +1,17 @@
+# streamlit_app.py
+
 import os
 import tempfile
 import base64
-import io
 import streamlit as st
 from dotenv import load_dotenv
-from fpdf import FPDF
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_together import ChatTogether
+from fpdf import FPDF
+import io
 
 # ---------------- SETUP ----------------
 load_dotenv()
@@ -158,15 +160,16 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
-# ---------------- EXPORT CHAT ----------------
+# ---------------- EXPORT CHAT HISTORY (.pdf and .txt) ----------------
 def export_chat_history():
     if not st.session_state.chat_history:
         return
 
     try:
+        # PDF Export
         pdf = FPDF()
         pdf.add_page()
-        pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+        pdf.add_font("DejaVu", "", "dejavu-sans.ttf", uni=True)
         pdf.set_font("DejaVu", "", 12)
         pdf.set_auto_page_break(auto=True, margin=15)
 
@@ -183,6 +186,19 @@ def export_chat_history():
             data=pdf_buffer,
             file_name="chat_history.pdf",
             mime="application/pdf"
+        )
+
+        # TXT Export
+        chat_text = ""
+        for msg in st.session_state.chat_history:
+            role = "You" if msg["role"] == "user" else "Tiet-Genie"
+            chat_text += f"{role}:\n{msg['message']}\n\n"
+
+        st.sidebar.download_button(
+            label="📝 Download as .txt",
+            data=chat_text,
+            file_name="chat_history.txt",
+            mime="text/plain"
         )
 
     except Exception as e:
