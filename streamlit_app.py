@@ -3,7 +3,12 @@ import tempfile
 import base64
 import streamlit as st
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader, UnstructuredMarkdownLoader
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    TextLoader,
+    UnstructuredWordDocumentLoader,
+    UnstructuredMarkdownLoader
+)
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -12,12 +17,12 @@ from pptx import Presentation
 from fpdf import FPDF
 import io
 
-# Load API key
+# ---------------- SETUP ----------------
 load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# Set background
+
 def set_bg_with_overlay(image_path):
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
@@ -36,7 +41,10 @@ def set_bg_with_overlay(image_path):
         width: 100%; height: 100%;
         z-index: 0;
     }}
-    .block-container {{ position: relative; z-index: 1; }}
+    .block-container {{
+        position: relative;
+        z-index: 1;
+    }}
     .stChatMessageContent, .stMarkdown {{
         color: #111 !important;
         font-weight: 500;
@@ -44,16 +52,22 @@ def set_bg_with_overlay(image_path):
     </style>
     """, unsafe_allow_html=True)
 
+
 set_bg_with_overlay("thaparbg.jpg")
 
-# Sidebar
+# ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.image("TIETlogo.png", width=120)
     st.markdown("## 🤖 Tiet-Genie")
     st.markdown("How can I assist you today? 😊")
-    uploaded_files = st.file_uploader("📎 Upload PDFs, DOCX, PPTX, TXT, or MD", type=["pdf", "docx", "pptx", "txt", "md"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader(
+        "📎 Upload PDFs, DOCX, PPTX, TXT, or MD",
+        type=["pdf", "docx", "pptx", "txt", "md"],
+        accept_multiple_files=True
+    )
 
-# Load default PDFs
+
+# ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
 def load_default_vectorstore():
     default_files = ["rules.pdf", "Sequence Models-I.pdf"]
@@ -66,9 +80,11 @@ def load_default_vectorstore():
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return FAISS.from_documents(chunks, embed)
 
+
 vector_store = load_default_vectorstore()
 
-# Handle upload
+
+# ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
     if ext == "pdf":
         return PyPDFLoader(file_path).load()
@@ -87,6 +103,7 @@ def load_file_to_docs(file_path, ext):
         return UnstructuredMarkdownLoader(file_path).load()
     return []
 
+
 if uploaded_files:
     new_docs = []
     for f in uploaded_files:
@@ -102,24 +119,35 @@ if uploaded_files:
     new_vs = FAISS.from_documents(new_chunks, embed)
     vector_store.merge_from(new_vs)
 
-# Setup LLM
-retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5})
-llm = ChatTogether(model="deepseek-ai/DeepSeek-V3", temperature=0.2, together_api_key=together_api_key)
 
-# Chat history
+# ---------------- LLM + RETRIEVER ----------------
+retriever = vector_store.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
+)
+
+llm = ChatTogether(
+    model="deepseek-ai/DeepSeek-V3",
+    temperature=0.2,
+    together_api_key=together_api_key
+)
+
+
+# ---------------- CHAT HISTORY ----------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "greeted" not in st.session_state:
     st.session_state.greeted = False
+
 if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
 
-# Display history
+
+# ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["message"], unsafe_allow_html=True)
 
-# Chat input
 user_prompt = st.chat_input("Ask something about TIET or the lecture notes...")
 if user_prompt:
     with st.chat_message("user"):
@@ -130,7 +158,11 @@ if user_prompt:
         with st.spinner("Thinking..."):
             try:
                 retrieved_docs = retriever.get_relevant_documents(user_prompt)
-                context_text = "\n\n".join(f"[Page {doc.metadata.get('page', '?')}] {doc.page_content.strip()}" for doc in retrieved_docs)
+
+                context_text = "\n\n".join([
+                    f"[Page {doc.metadata.get('page', '?')}] {doc.page_content.strip()}" for doc in retrieved_docs
+                ])
+
                 prompt_to_llm = f"""
 You are an AI assistant for Thapar Institute. Use the following document snippets to answer the question. Be specific and cite relevant details.
 
@@ -140,6 +172,7 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 --- QUESTION ---
 {user_prompt}
 """
+
                 response_obj = llm.invoke(prompt_to_llm)
                 response = response_obj.content.strip() if hasattr(response_obj, "content") else str(response_obj).strip()
 
@@ -154,20 +187,23 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.session_state.chat_history.append({"role": "assistant", "message": final_response})
 
             except Exception as e:
-                st.markdown(f"⚠️ Error: {e}")
-                st.session_state.chat_history.append({"role": "assistant", "message": str(e)})
+                error_response = f"⚠️ Error: {str(e)}"
+                st.markdown(error_response)
+                st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
-# Export Chat History
+
+# ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
-    if not chat: return
+    if not chat:
+        return
 
-    # PDF Export (Unicode-safe)
+    # --- PDF Export (Unicode-safe) ---
     pdf = FPDF()
     pdf.add_page()
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 12)
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_font("DejaVu", "", "dejavu-sans.ttf", uni=True)
-    pdf.set_font("DejaVu", size=12)
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
@@ -175,7 +211,7 @@ def export_chat_history():
     pdf.output(pdf_buffer)
     pdf_buffer.seek(0)
 
-    # TXT Export
+    # --- TXT Export ---
     txt_buffer = io.StringIO()
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
@@ -183,7 +219,18 @@ def export_chat_history():
     txt_buffer.seek(0)
 
     st.sidebar.markdown("### 📤 Export Chat History")
-    st.sidebar.download_button("⬇️ Download as .pdf", data=pdf_buffer, file_name="chat_history.pdf", mime="application/pdf")
-    st.sidebar.download_button("⬇️ Download as .txt", data=txt_buffer, file_name="chat_history.txt", mime="text/plain")
+    st.sidebar.download_button(
+        "⬇️ Download as .pdf",
+        data=pdf_buffer,
+        file_name="chat_history.pdf",
+        mime="application/pdf"
+    )
+    st.sidebar.download_button(
+        "⬇️ Download as .txt",
+        data=txt_buffer.getvalue(),  # ✅ Fix applied here
+        file_name="chat_history.txt",
+        mime="text/plain"
+    )
+
 
 export_chat_history()
