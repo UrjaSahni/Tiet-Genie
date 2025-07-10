@@ -22,21 +22,33 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
+# Dark Mode Toggle
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
 
-def set_bg_with_overlay(image_path, dark_mode=False):
-    with open(image_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
+with st.sidebar:
+    st.toggle("🌙 Dark Mode", key="dark_mode")
+
+def apply_theme():
+    if st.session_state.dark_mode:
+        bg_color = "#2e2e2e"
+        overlay_color = "rgba(30, 30, 30, 0.95)"
+        text_color = "#f1f1f1"
+    else:
+        bg_color = "#ffffff"
+        overlay_color = "rgba(255, 255, 255, 0.82)"
+        text_color = "#111111"
+
     st.markdown(f"""
     <style>
     .main > div:has(.block-container) {{
-        background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
+        background: {bg_color};
         background-size: cover;
         position: relative;
     }}
     .main > div:has(.block-container)::before {{
         content: "";
-        background-color: rgba({ '17, 17, 17, 0.88' if dark_mode else '255, 255, 255, 0.82' });
+        background-color: {overlay_color};
         position: absolute;
         top: 0; left: 0;
         width: 100%; height: 100%;
@@ -45,19 +57,16 @@ def set_bg_with_overlay(image_path, dark_mode=False):
     .block-container {{
         position: relative;
         z-index: 1;
+        color: {text_color};
     }}
     .stChatMessageContent, .stMarkdown {{
-        color: {'#EEE' if dark_mode else '#111'} !important;
+        color: {text_color} !important;
         font-weight: 500;
-    }}
-    .stTextInput input {{
-        background-color: {'#2e2e2e' if dark_mode else '#fff'};
-        color: {'#eee' if dark_mode else '#000'};
     }}
     </style>
     """, unsafe_allow_html=True)
 
-set_bg_with_overlay("thaparbg.jpg", dark_mode)
+apply_theme()
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
@@ -69,6 +78,7 @@ with st.sidebar:
         type=["pdf", "docx", "pptx", "txt", "md"],
         accept_multiple_files=True
     )
+
 
 # ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
