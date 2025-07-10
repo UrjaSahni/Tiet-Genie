@@ -61,7 +61,7 @@ with st.sidebar:
     st.markdown("## 🤖 Tiet-Genie")
     st.markdown("How can I assist you today? 😊")
     uploaded_files = st.file_uploader(
-        "📎 Upload PDFs, DOCX, PPTX, TXT, or MD",
+        "📌 Upload PDFs, DOCX, PPTX, TXT, or MD",
         type=["pdf", "docx", "pptx", "txt", "md"],
         accept_multiple_files=True
     )
@@ -96,7 +96,6 @@ llm = ChatTogether(
 )
 
 
-
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
     if ext == "pdf":
@@ -127,34 +126,12 @@ if uploaded_files:
             tmp.write(f.read())
             tmp_path = tmp.name
 
-        # Load and split document
         docs = load_file_to_docs(tmp_path, ext)
         new_docs.extend(docs)
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         chunks = splitter.split_documents(docs)
         new_vs = FAISS.from_documents(chunks, embed)
         vector_store.merge_from(new_vs)
-
-        # Generate Summary for this file
-        doc_text = "\n".join(doc.page_content for doc in docs)
-        summary_prompt = f"""
-        Summarize the following content in concise bullet points focusing on key topics and concepts:
-
-        {doc_text[:3000]}
-
-        Summary:
-        """
-        try:
-            summary_obj = llm.invoke(summary_prompt)
-            summary = summary_obj.content.strip() if hasattr(summary_obj, "content") else str(summary_obj).strip()
-        except Exception as e:
-            summary = f"⚠️ Summary generation failed for {f.name}: {e}"
-
-        # Display the summary in main area
-        with st.expander(f"📄 Summary for `{f.name}`", expanded=True):
-            st.markdown(summary)
-
-
 
 
 # ---------------- CHAT HISTORY ----------------
@@ -242,7 +219,7 @@ def export_chat_history():
         txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
     txt_buffer.seek(0)
 
-    st.sidebar.markdown("### 📤 Export Chat History")
+    st.sidebar.markdown("### 📄 Export Chat History")
     st.sidebar.download_button(
         "⬇️ Download as .pdf",
         data=pdf_buffer,
@@ -251,7 +228,7 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),  # ✅ Fix applied here
+        data=txt_buffer.getvalue(),
         file_name="chat_history.txt",
         mime="text/plain"
     )
