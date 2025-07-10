@@ -22,47 +22,42 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# ---------------- DARK MODE TOGGLE ----------------
-dark_mode = st.sidebar.toggle("🌙 Dark Mode")
+dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
 
-if dark_mode:
-    st.markdown("""
+def set_bg_with_overlay(image_path, dark_mode=False):
+    with open(image_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    st.markdown(f"""
     <style>
-        .main { background-color: #0e1117 !important; }
-        .stChatMessageContent, .stMarkdown, .block-container, .stTextInput, .stButton { color: #fff !important; }
+    .main > div:has(.block-container) {{
+        background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
+        background-size: cover;
+        position: relative;
+    }}
+    .main > div:has(.block-container)::before {{
+        content: "";
+        background-color: rgba({ '17, 17, 17, 0.88' if dark_mode else '255, 255, 255, 0.82' });
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        z-index: 0;
+    }}
+    .block-container {{
+        position: relative;
+        z-index: 1;
+    }}
+    .stChatMessageContent, .stMarkdown {{
+        color: {'#EEE' if dark_mode else '#111'} !important;
+        font-weight: 500;
+    }}
+    .stTextInput input {{
+        background-color: {'#2e2e2e' if dark_mode else '#fff'};
+        color: {'#eee' if dark_mode else '#000'};
+    }}
     </style>
     """, unsafe_allow_html=True)
-else:
-    def set_bg_with_overlay(image_path):
-        with open(image_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        st.markdown(f"""
-        <style>
-        .main > div:has(.block-container) {{
-            background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
-            background-size: cover;
-            position: relative;
-        }}
-        .main > div:has(.block-container)::before {{
-            content: "";
-            background-color: rgba(255, 255, 255, 0.82);
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-        }}
-        .block-container {{
-            position: relative;
-            z-index: 1;
-        }}
-        .stChatMessageContent, .stMarkdown {{
-            color: #111 !important;
-            font-weight: 500;
-        }}
-        </style>
-        """, unsafe_allow_html=True)
 
-    set_bg_with_overlay("thaparbg.jpg")
+set_bg_with_overlay("thaparbg.jpg", dark_mode)
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
@@ -74,8 +69,6 @@ with st.sidebar:
         type=["pdf", "docx", "pptx", "txt", "md"],
         accept_multiple_files=True
     )
-
-
 
 # ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
@@ -90,9 +83,7 @@ def load_default_vectorstore():
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return FAISS.from_documents(chunks, embed)
 
-
 vector_store = load_default_vectorstore()
-
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
@@ -113,7 +104,6 @@ def load_file_to_docs(file_path, ext):
         return UnstructuredMarkdownLoader(file_path).load()
     return []
 
-
 if uploaded_files:
     new_docs = []
     for f in uploaded_files:
@@ -129,7 +119,6 @@ if uploaded_files:
     new_vs = FAISS.from_documents(new_chunks, embed)
     vector_store.merge_from(new_vs)
 
-
 # ---------------- LLM + RETRIEVER ----------------
 retriever = vector_store.as_retriever(
     search_type="mmr",
@@ -142,7 +131,6 @@ llm = ChatTogether(
     together_api_key=together_api_key
 )
 
-
 # ---------------- CHAT HISTORY ----------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -151,7 +139,6 @@ if "greeted" not in st.session_state:
 
 if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
-
 
 # ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
@@ -201,7 +188,6 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
-
 # ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
@@ -237,10 +223,9 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),  # ✅ Fix applied here
+        data=txt_buffer.getvalue(),
         file_name="chat_history.txt",
         mime="text/plain"
     )
-
 
 export_chat_history()
