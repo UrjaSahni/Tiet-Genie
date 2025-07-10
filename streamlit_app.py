@@ -1,15 +1,15 @@
 import os
 import tempfile
 import base64
+import io
 import streamlit as st
 from dotenv import load_dotenv
+from fpdf import FPDF
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_together import ChatTogether
-from fpdf import FPDF
-import io
 
 # ---------------- SETUP ----------------
 load_dotenv()
@@ -158,43 +158,34 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
-# ---------------- EXPORT CHAT HISTORY ----------------
+# ---------------- EXPORT CHAT ----------------
 def export_chat_history():
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 💬 Export Chat")
+    if not st.session_state.chat_history:
+        return
 
-    chat_text = ""
-    for msg in st.session_state.chat_history:
-        role = "👩‍💻 You" if msg["role"] == "user" else "🤖 Tiet-Genie"
-        chat_text += f"{role}:\n{msg['message']}\n\n"
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+        pdf.set_font("DejaVu", "", 12)
+        pdf.set_auto_page_break(auto=True, margin=15)
 
-    st.sidebar.download_button(
-        label="⬇️ Download as .txt",
-        data=chat_text,
-        file_name="chat_history.txt",
-        mime="text/plain"
-    )
+        for msg in st.session_state.chat_history:
+            role = "You" if msg["role"] == "user" else "Tiet-Genie"
+            pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
 
-    # Generate PDF in memory using fpdf2
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Arial", size=12)
+        pdf_buffer = io.BytesIO()
+        pdf.output(pdf_buffer)
+        pdf_buffer.seek(0)
 
-    for msg in st.session_state.chat_history:
-        role = "You" if msg["role"] == "user" else "Tiet-Genie"
-        pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
+        st.sidebar.download_button(
+            label="⬇️ Download as .pdf",
+            data=pdf_buffer,
+            file_name="chat_history.pdf",
+            mime="application/pdf"
+        )
 
-    # Use BytesIO directly (fpdf2 supports it)
-    pdf_buffer = io.BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)
-
-    st.sidebar.download_button(
-        label="⬇️ Download as .pdf",
-        data=pdf_buffer,
-        file_name="chat_history.pdf",
-        mime="application/pdf"
-    )
+    except Exception as e:
+        st.sidebar.error(f"❌ Export failed: {e}")
 
 export_chat_history()
