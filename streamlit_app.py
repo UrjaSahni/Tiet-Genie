@@ -175,6 +175,7 @@ def export_chat_history():
         mime="text/plain"
     )
 
+    # Generate PDF in memory using fpdf2
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -184,6 +185,7 @@ def export_chat_history():
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
 
+    # Use BytesIO directly (fpdf2 supports it)
     pdf_buffer = io.BytesIO()
     pdf.output(pdf_buffer)
     pdf_buffer.seek(0)
