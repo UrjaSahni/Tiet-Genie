@@ -59,6 +59,7 @@ def load_default_vectorstore():
     docs = []
     for path in default_files:
         docs.extend(PyPDFLoader(path).load())
+
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -73,6 +74,7 @@ if uploaded_files:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             tmp.write(f.read())
             new_docs.extend(PyPDFLoader(tmp.name).load())
+
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     new_chunks = splitter.split_documents(new_docs)
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -117,12 +119,12 @@ if user_prompt:
                 # Step 1: Retrieve documents
                 retrieved_docs = retriever.get_relevant_documents(user_prompt)
 
-                # Step 2: Prepare context
+                # Step 2: Prepare context from retrieved docs
                 context_text = "\n\n".join([
                     f"[Page {doc.metadata.get('page', '?')}] {doc.page_content.strip()}" for doc in retrieved_docs
                 ])
 
-                # Step 3: Build prompt
+                # Step 3: Construct the prompt
                 prompt_to_llm = f"""
 You are an AI assistant for Thapar Institute. Use the following document snippets to answer the question. Be specific and cite relevant details.
 
@@ -133,30 +135,23 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 {user_prompt}
 """
 
-                # Step 4: Get response
+                # ❌ Prompt visibility removed
+
+                # Step 4: Get clean LLM response
                 response_obj = llm.invoke(prompt_to_llm)
                 response = response_obj.content.strip() if hasattr(response_obj, "content") else str(response_obj).strip()
 
-                # Step 5: Collect source snippets
-                source_section = ""
+                # Step 5: Format source snippets
+                source_section = "\n\n---\n\n**📄 Source Snippets:**\n"
                 for i, doc in enumerate(retrieved_docs, 1):
                     page = doc.metadata.get("page", "?")
-                    snippet = doc.page_content.strip().replace("\n", " ")
-                    source_section += f"**Snippet {i} (Page {page})**\n{snippet}\n\n"
+                    snippet = doc.page_content.strip().replace("\n", " ")[:300]
+                    source_section += f"- **Snippet {i} (Page {page})**: {snippet}\n"
 
-                # Step 6: Display answer with copy
-                st.markdown("### 🤖 Answer")
-                st.code(response, language="markdown")
-                st.text_area("Copy Answer:", value=response, height=100, key="copy_answer_box")
-
-                # Step 7: Display all snippets with copy
-                st.markdown("### 📄 Source Snippets")
-                st.code(source_section.strip(), language="markdown")
-                st.text_area("Copy All Snippets:", value=source_section.strip(), height=200, key="copy_snippets_box")
-
-                # Step 8: Save chat
-                final_combined_output = f"### 🤖 Answer\n{response}\n\n### 📄 Source Snippets\n{source_section.strip()}"
-                st.session_state.chat_history.append({"role": "assistant", "message": final_combined_output})
+                # Step 6: Combine and display
+                final_response = f"{response}\n{source_section}"
+                st.markdown(final_response, unsafe_allow_html=True)
+                st.session_state.chat_history.append({"role": "assistant", "message": final_response})
 
             except Exception as e:
                 error_response = f"⚠️ Error: {str(e)}"
