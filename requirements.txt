@@ -1,5 +1,4 @@
 faiss-cpu
-fpdf
 fpdf2
 langchain
 langchain-community
