@@ -164,7 +164,7 @@ if user_prompt:
                 ])
 
                 prompt_to_llm = f"""
-You are an AI assistant for Thapar Institute. Use the following document snippets to answer the question. Be specific and cite relevant details.
+You are an AI assistant for Thapar Institute. Use the following document snippets to answer the question. Be specific and provide detailed information, but DO NOT include page numbers or citations like [Page X] in your main answer. The source snippets will be provided separately.
 
 --- DOCUMENTS ---
 {context_text}
