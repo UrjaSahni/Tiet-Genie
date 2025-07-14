@@ -198,39 +198,39 @@ def export_chat_history():
     if not chat:
         return
 
-    # --- PDF Export (Unicode-safe) ---
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", "", 12)
-    pdf.set_auto_page_break(auto=True, margin=15)
-    for msg in chat:
-        role = "You" if msg["role"] == "user" else "Tiet-Genie"
-        pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
-    pdf_buffer = io.BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)
+    # # --- PDF Export (Unicode-safe) ---
+    # pdf = FPDF()
+    # pdf.add_page()
+    # pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    # pdf.set_font("DejaVu", "", 12)
+    # pdf.set_auto_page_break(auto=True, margin=15)
+    # for msg in chat:
+    #     role = "You" if msg["role"] == "user" else "Tiet-Genie"
+    #     pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
+    # pdf_buffer = io.BytesIO()
+    # pdf.output(pdf_buffer)
+    # pdf_buffer.seek(0)
 
-    # --- TXT Export ---
-    txt_buffer = io.StringIO()
-    for msg in chat:
-        role = "You" if msg["role"] == "user" else "Tiet-Genie"
-        txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
-    txt_buffer.seek(0)
+    # # --- TXT Export ---
+    # txt_buffer = io.StringIO()
+    # for msg in chat:
+    #     role = "You" if msg["role"] == "user" else "Tiet-Genie"
+    #     txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
+    # txt_buffer.seek(0)
 
-    st.sidebar.markdown("### 📤 Export Chat History")
-    st.sidebar.download_button(
-        "⬇️ Download as .pdf",
-        data=pdf_buffer,
-        file_name="chat_history.pdf",
-        mime="application/pdf"
-    )
-    st.sidebar.download_button(
-        "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),  # ✅ Fix applied here
-        file_name="chat_history.txt",
-        mime="text/plain"
-    )
+    # st.sidebar.markdown("### 📤 Export Chat History")
+    # st.sidebar.download_button(
+    #     "⬇️ Download as .pdf",
+    #     data=pdf_buffer,
+    #     file_name="chat_history.pdf",
+    #     mime="application/pdf"
+    # )
+    # st.sidebar.download_button(
+    #     "⬇️ Download as .txt",
+    #     data=txt_buffer.getvalue(),  # ✅ Fix applied here
+    #     file_name="chat_history.txt",
+    #     mime="text/plain"
+    # )
 
 
 export_chat_history()
