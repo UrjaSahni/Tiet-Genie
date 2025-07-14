@@ -22,7 +22,7 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
-# ---------------- BACKGROUND ----------------
+
 def set_bg_with_overlay(image_path):
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
@@ -52,6 +52,7 @@ def set_bg_with_overlay(image_path):
     </style>
     """, unsafe_allow_html=True)
 
+
 set_bg_with_overlay("thaparbg.jpg")
 
 # ---------------- SIDEBAR ----------------
@@ -64,6 +65,7 @@ with st.sidebar:
         type=["pdf", "docx", "pptx", "txt", "md"],
         accept_multiple_files=True
     )
+
 
 # ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
@@ -78,7 +80,22 @@ def load_default_vectorstore():
     embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return FAISS.from_documents(chunks, embed)
 
+
 vector_store = load_default_vectorstore()
+
+# ---------------- LLM + RETRIEVER ----------------
+retriever = vector_store.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
+)
+
+llm = ChatTogether(
+    model="deepseek-ai/DeepSeek-V3",
+    temperature=0.2,
+    together_api_key=together_api_key
+)
+
+
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
@@ -99,32 +116,46 @@ def load_file_to_docs(file_path, ext):
         return UnstructuredMarkdownLoader(file_path).load()
     return []
 
+
 if uploaded_files:
     new_docs = []
+    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     for f in uploaded_files:
         ext = f.name.split(".")[-1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
             tmp.write(f.read())
             tmp_path = tmp.name
-        new_docs.extend(load_file_to_docs(tmp_path, ext))
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    new_chunks = splitter.split_documents(new_docs)
-    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    new_vs = FAISS.from_documents(new_chunks, embed)
-    vector_store.merge_from(new_vs)
+        # Load and split document
+        docs = load_file_to_docs(tmp_path, ext)
+        new_docs.extend(docs)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        chunks = splitter.split_documents(docs)
+        new_vs = FAISS.from_documents(chunks, embed)
+        vector_store.merge_from(new_vs)
 
-# ---------------- LLM + RETRIEVER ----------------
-retriever = vector_store.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
-)
+        # Generate Summary for this file
+        doc_text = "\n".join(doc.page_content for doc in docs)
+        summary_prompt = f"""
+        Summarize the following content in concise bullet points focusing on key topics and concepts:
 
-llm = ChatTogether(
-    model="deepseek-ai/DeepSeek-V3",
-    temperature=0.2,
-    together_api_key=together_api_key
-)
+        {doc_text[:3000]}
+
+        Summary:
+        """
+        try:
+            summary_obj = llm.invoke(summary_prompt)
+            summary = summary_obj.content.strip() if hasattr(summary_obj, "content") else str(summary_obj).strip()
+        except Exception as e:
+            summary = f"⚠️ Summary generation failed for {f.name}: {e}"
+
+        # Display the summary in main area
+        with st.expander(f"📄 Summary for {f.name}", expanded=True):
+            st.markdown(summary)
+
+
+
 
 # ---------------- CHAT HISTORY ----------------
 if "chat_history" not in st.session_state:
@@ -134,6 +165,7 @@ if "greeted" not in st.session_state:
 
 if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
+
 
 # ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
@@ -183,23 +215,25 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
+
 # ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
     if not chat:
         return
 
-    # --- PDF Export (Safe Font) ---
+    # --- PDF Export (Unicode-safe) ---
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 12)
     pdf.set_auto_page_break(auto=True, margin=15)
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
-
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    pdf_buffer = io.BytesIO(pdf_bytes)
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
 
     # --- TXT Export ---
     txt_buffer = io.StringIO()
@@ -217,9 +251,10 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),
+        data=txt_buffer.getvalue(),  # ✅ Fix applied here
         file_name="chat_history.txt",
         mime="text/plain"
     )
+
 
 export_chat_history()
