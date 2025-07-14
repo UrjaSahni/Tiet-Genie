@@ -66,7 +66,6 @@ with st.sidebar:
         accept_multiple_files=True
     )
 
-
 # ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
 def load_default_vectorstore():
@@ -82,7 +81,6 @@ def load_default_vectorstore():
 
 
 vector_store = load_default_vectorstore()
-
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
@@ -103,7 +101,6 @@ def load_file_to_docs(file_path, ext):
         return UnstructuredMarkdownLoader(file_path).load()
     return []
 
-
 if uploaded_files:
     new_docs = []
     for f in uploaded_files:
@@ -119,7 +116,6 @@ if uploaded_files:
     new_vs = FAISS.from_documents(new_chunks, embed)
     vector_store.merge_from(new_vs)
 
-
 # ---------------- LLM + RETRIEVER ----------------
 retriever = vector_store.as_retriever(
     search_type="mmr",
@@ -132,7 +128,6 @@ llm = ChatTogether(
     together_api_key=together_api_key
 )
 
-
 # ---------------- CHAT HISTORY ----------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -141,7 +136,6 @@ if "greeted" not in st.session_state:
 
 if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
-
 
 # ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
@@ -191,7 +185,6 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
-
 # ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
@@ -207,9 +200,9 @@ def export_chat_history():
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
-    pdf_buffer = io.BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)
+
+    pdf_bytes = pdf.output(dest="S").encode("latin1")
+    pdf_buffer = io.BytesIO(pdf_bytes)
 
     # --- TXT Export ---
     txt_buffer = io.StringIO()
@@ -227,10 +220,9 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),  # ✅ Fix applied here
+        data=txt_buffer.getvalue(),
         file_name="chat_history.txt",
         mime="text/plain"
     )
-
 
 export_chat_history()
