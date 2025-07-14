@@ -22,11 +22,15 @@ load_dotenv()
 together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
+# ---------------- DARK MODE TOGGLE ----------------
+dark_mode = st.sidebar.toggle("🌙 Dark Mode")
 
 def set_bg_with_overlay(image_path):
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     st.markdown(f"""
+if dark_mode:
+    st.markdown("""
     <style>
     .main > div:has(.block-container) {{
         background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
@@ -49,22 +53,51 @@ def set_bg_with_overlay(image_path):
         color: #111 !important;
         font-weight: 500;
     }}
+        .main { background-color: #0e1117 !important; }
+        .stChatMessageContent, .stMarkdown, .block-container, .stTextInput, .stButton { color: #fff !important; }
     </style>
     """, unsafe_allow_html=True)
 
 
 set_bg_with_overlay("thaparbg.jpg")
+else:
+    def set_bg_with_overlay(image_path):
+        with open(image_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        st.markdown(f"""
+        <style>
+        .main > div:has(.block-container) {{
+            background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
+            background-size: cover;
+            position: relative;
+        }}
+        .main > div:has(.block-container)::before {{
+            content: "";
+            background-color: rgba(255, 255, 255, 0.82);
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }}
+        .block-container {{
+            position: relative;
+            z-index: 1;
+        }}
+        .stChatMessageContent, .stMarkdown {{
+            color: #111 !important;
+            font-weight: 500;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
+    set_bg_with_overlay("thaparbg.jpg")
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.image("TIETlogo.png", width=120)
-    st.markdown("## 🤖 Tiet-Genie")
-    st.markdown("How can I assist you today? 😊")
-    uploaded_files = st.file_uploader(
-        "📎 Upload PDFs, DOCX, PPTX, TXT, or MD",
-        type=["pdf", "docx", "pptx", "txt", "md"],
-        accept_multiple_files=True
+@@ -67,170 +76,171 @@
     )
+
+
 
 # ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
@@ -81,6 +114,7 @@ def load_default_vectorstore():
 
 
 vector_store = load_default_vectorstore()
+
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
@@ -101,6 +135,7 @@ def load_file_to_docs(file_path, ext):
         return UnstructuredMarkdownLoader(file_path).load()
     return []
 
+
 if uploaded_files:
     new_docs = []
     for f in uploaded_files:
@@ -116,6 +151,7 @@ if uploaded_files:
     new_vs = FAISS.from_documents(new_chunks, embed)
     vector_store.merge_from(new_vs)
 
+
 # ---------------- LLM + RETRIEVER ----------------
 retriever = vector_store.as_retriever(
     search_type="mmr",
@@ -128,6 +164,7 @@ llm = ChatTogether(
     together_api_key=together_api_key
 )
 
+
 # ---------------- CHAT HISTORY ----------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -136,6 +173,7 @@ if "greeted" not in st.session_state:
 
 if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
+
 
 # ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
@@ -185,24 +223,25 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.markdown(error_response)
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
+
 # ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
     if not chat:
         return
 
-    # --- PDF Export (Safe Font) ---
+    # --- PDF Export (Unicode-safe) ---
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 12)
     pdf.set_auto_page_break(auto=True, margin=15)
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
-
-    # Safely output PDF to memory buffer
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    pdf_buffer = io.BytesIO(pdf_bytes)
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
 
     # --- TXT Export ---
     txt_buffer = io.StringIO()
@@ -220,9 +259,10 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),
+        data=txt_buffer.getvalue(),  # ✅ Fix applied here
         file_name="chat_history.txt",
         mime="text/plain"
     )
-    
+
+
 export_chat_history()
