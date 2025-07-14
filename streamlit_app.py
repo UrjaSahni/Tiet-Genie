@@ -198,40 +198,63 @@ def export_chat_history():
     if not chat:
         return
 
-    # --- PDF Export (Unicode-safe) ---
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", "", 12)
-    pdf.set_auto_page_break(auto=True, margin=15)
-    for msg in chat:
-        role = "You" if msg["role"] == "user" else "Tiet-Genie"
-        pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
+    try:
+        # --- PDF Export (Using built-in fonts only) ---
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)  # Use built-in Arial font
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+        for msg in chat:
+            role = "You" if msg["role"] == "user" else "Tiet-Genie"
+            # Clean message text to handle special characters
+            clean_message = msg['message'].encode('latin1', 'ignore').decode('latin1')
+            pdf.multi_cell(0, 10, f"{role}:\n{clean_message}\n")
 
-    # ✅ Fix: Output PDF to bytes
-    pdf_bytes = pdf.output(dest='S').encode('latin1')
-    pdf_buffer = io.BytesIO(pdf_bytes)
+        # Output PDF to bytes
+        pdf_bytes = pdf.output(dest='S').encode('latin1')
+        pdf_buffer = io.BytesIO(pdf_bytes)
 
-    # --- TXT Export ---
-    txt_buffer = io.StringIO()
-    for msg in chat:
-        role = "You" if msg["role"] == "user" else "Tiet-Genie"
-        txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
-    txt_buffer.seek(0)
+        # --- TXT Export ---
+        txt_buffer = io.StringIO()
+        for msg in chat:
+            role = "You" if msg["role"] == "user" else "Tiet-Genie"
+            txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
+        txt_buffer.seek(0)
 
-    st.sidebar.markdown("### 📤 Export Chat History")
-    st.sidebar.download_button(
-        "⬇️ Download as .pdf",
-        data=pdf_buffer,
-        file_name="chat_history.pdf",
-        mime="application/pdf"
-    )
-    st.sidebar.download_button(
-        "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),
-        file_name="chat_history.txt",
-        mime="text/plain"
-    )
+        st.sidebar.markdown("### 📤 Export Chat History")
+        st.sidebar.download_button(
+            "⬇️ Download as .pdf",
+            data=pdf_buffer,
+            file_name="chat_history.pdf",
+            mime="application/pdf"
+        )
+        st.sidebar.download_button(
+            "⬇️ Download as .txt",
+            data=txt_buffer.getvalue(),
+            file_name="chat_history.txt",
+            mime="text/plain"
+        )
+        
+    except Exception as e:
+        st.sidebar.error(f"Export error: {str(e)}")
+        # Fallback: Only show TXT export if PDF fails
+        try:
+            txt_buffer = io.StringIO()
+            for msg in chat:
+                role = "You" if msg["role"] == "user" else "Tiet-Genie"
+                txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
+            txt_buffer.seek(0)
+            
+            st.sidebar.markdown("### 📤 Export Chat History")
+            st.sidebar.download_button(
+                "⬇️ Download as .txt",
+                data=txt_buffer.getvalue(),
+                file_name="chat_history.txt",
+                mime="text/plain"
+            )
+        except Exception as fallback_error:
+            st.sidebar.error(f"Export failed: {str(fallback_error)}")
 
 
 export_chat_history()
