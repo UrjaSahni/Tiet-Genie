@@ -191,16 +191,16 @@ def export_chat_history():
     if not chat:
         return
 
-    # --- PDF Export (Unicode-safe) ---
+    # --- PDF Export (Safe Font) ---
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", "", 12)
+    pdf.set_font("Arial", size=12)
     pdf.set_auto_page_break(auto=True, margin=15)
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
 
+    # Safely output PDF to memory buffer
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     pdf_buffer = io.BytesIO(pdf_bytes)
 
@@ -224,5 +224,5 @@ def export_chat_history():
         file_name="chat_history.txt",
         mime="text/plain"
     )
-
+    
 export_chat_history()
