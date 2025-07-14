@@ -207,9 +207,10 @@ def export_chat_history():
     for msg in chat:
         role = "You" if msg["role"] == "user" else "Tiet-Genie"
         pdf.multi_cell(0, 10, f"{role}:\n{msg['message']}\n")
-    pdf_buffer = io.BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)
+
+    # ✅ Fix: Output PDF to bytes
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    pdf_buffer = io.BytesIO(pdf_bytes)
 
     # --- TXT Export ---
     txt_buffer = io.StringIO()
@@ -227,7 +228,7 @@ def export_chat_history():
     )
     st.sidebar.download_button(
         "⬇️ Download as .txt",
-        data=txt_buffer.getvalue(),  # ✅ Fix applied here
+        data=txt_buffer.getvalue(),
         file_name="chat_history.txt",
         mime="text/plain"
     )
