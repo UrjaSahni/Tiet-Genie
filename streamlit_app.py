@@ -83,19 +83,6 @@ def load_default_vectorstore():
 
 vector_store = load_default_vectorstore()
 
-# ---------------- LLM + RETRIEVER ----------------
-retriever = vector_store.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
-)
-
-llm = ChatTogether(
-    model="deepseek-ai/DeepSeek-V3",
-    temperature=0.2,
-    together_api_key=together_api_key
-)
-
-
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
@@ -119,42 +106,31 @@ def load_file_to_docs(file_path, ext):
 
 if uploaded_files:
     new_docs = []
-    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
     for f in uploaded_files:
         ext = f.name.split(".")[-1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
             tmp.write(f.read())
             tmp_path = tmp.name
+        new_docs.extend(load_file_to_docs(tmp_path, ext))
 
-        # Load and split document
-        docs = load_file_to_docs(tmp_path, ext)
-        new_docs.extend(docs)
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        chunks = splitter.split_documents(docs)
-        new_vs = FAISS.from_documents(chunks, embed)
-        vector_store.merge_from(new_vs)
-
-        # Generate Summary for this file
-        doc_text = "\n".join(doc.page_content for doc in docs)
-        summary_prompt = f"""
-        Summarize the following content in concise bullet points focusing on key topics and concepts:
-
-        {doc_text[:3000]}
-
-        Summary:
-        """
-        try:
-            summary_obj = llm.invoke(summary_prompt)
-            summary = summary_obj.content.strip() if hasattr(summary_obj, "content") else str(summary_obj).strip()
-        except Exception as e:
-            summary = f"⚠️ Summary generation failed for {f.name}: {e}"
-
-        # Display the summary in main area
-        with st.expander(f"📄 Summary for {f.name}", expanded=True):
-            st.markdown(summary)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    new_chunks = splitter.split_documents(new_docs)
+    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    new_vs = FAISS.from_documents(new_chunks, embed)
+    vector_store.merge_from(new_vs)
 
 
+# ---------------- LLM + RETRIEVER ----------------
+retriever = vector_store.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
+)
+
+llm = ChatTogether(
+    model="deepseek-ai/DeepSeek-V3",
+    temperature=0.2,
+    together_api_key=together_api_key
+)
 
 
 # ---------------- CHAT HISTORY ----------------
