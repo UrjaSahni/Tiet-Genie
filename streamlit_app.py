@@ -95,7 +95,7 @@ def load_default_vectorstore():
         if os.path.exists(path):
             try:
                 docs.extend(PyPDFLoader(path).load())
-                st.success(f"✅ Loaded {path}")
+                # st.success(f"✅ Loaded {path}")  # Hidden to avoid clutter
             except Exception as e:
                 st.warning(f"⚠️ Failed to load {path}: {str(e)}")
         else:
