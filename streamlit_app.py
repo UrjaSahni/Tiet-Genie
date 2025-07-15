@@ -24,40 +24,57 @@ st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
 
 def set_bg_with_overlay(image_path):
-    with open(image_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
-    st.markdown(f"""
-    <style>
-    .main > div:has(.block-container) {{
-        background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
-        background-size: cover;
-        position: relative;
-    }}
-    .main > div:has(.block-container)::before {{
-        content: "";
-        background-color: rgba(255, 255, 255, 0.82);
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        z-index: 0;
-    }}
-    .block-container {{
-        position: relative;
-        z-index: 1;
-    }}
-    .stChatMessageContent, .stMarkdown {{
-        color: #111 !important;
-        font-weight: 500;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+    # Check if background image exists
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        st.markdown(f"""
+        <style>
+        .main > div:has(.block-container) {{
+            background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
+            background-size: cover;
+            position: relative;
+        }}
+        .main > div:has(.block-container)::before {{
+            content: "";
+            background-color: rgba(255, 255, 255, 0.82);
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }}
+        .block-container {{
+            position: relative;
+            z-index: 1;
+        }}
+        .stChatMessageContent, .stMarkdown {{
+            color: #111 !important;
+            font-weight: 500;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Fallback styling if background image doesn't exist
+        st.markdown("""
+        <style>
+        .stChatMessageContent, .stMarkdown {
+            color: #111 !important;
+            font-weight: 500;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
 
 set_bg_with_overlay("thaparbg.jpg")
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.image("TIETlogo.png", width=120)
+    # Check if logo exists before displaying
+    if os.path.exists("TIETlogo.png"):
+        st.image("TIETlogo.png", width=120)
+    else:
+        st.markdown("## 🏫 TIET")
+    
     st.markdown("## 🤖 Tiet-Genie")
     st.markdown("How can I assist you today? 😊")
     uploaded_files = st.file_uploader(
@@ -72,8 +89,25 @@ with st.sidebar:
 def load_default_vectorstore():
     default_files = ["rules.pdf", "AcademicRegulations.pdf"]
     docs = []
+    
+    # Only load files that actually exist
     for path in default_files:
-        docs.extend(PyPDFLoader(path).load())
+        if os.path.exists(path):
+            try:
+                docs.extend(PyPDFLoader(path).load())
+                st.success(f"✅ Loaded {path}")
+            except Exception as e:
+                st.warning(f"⚠️ Failed to load {path}: {str(e)}")
+        else:
+            st.warning(f"⚠️ File not found: {path}")
+    
+    # If no default documents were loaded, create a minimal vectorstore
+    if not docs:
+        st.info("ℹ️ No default PDFs found. Upload your own files to get started.")
+        # Create a dummy document to initialize the vectorstore
+        from langchain.docstore.document import Document
+        dummy_doc = Document(page_content="Welcome to Tiet-Genie! Please upload your documents to get started.", metadata={})
+        docs = [dummy_doc]
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
@@ -81,56 +115,96 @@ def load_default_vectorstore():
     return FAISS.from_documents(chunks, embed)
 
 
-vector_store = load_default_vectorstore()
+# Initialize vector store with error handling
+try:
+    vector_store = load_default_vectorstore()
+except Exception as e:
+    st.error(f"❌ Error initializing vector store: {str(e)}")
+    st.stop()
 
 
 # ---------------- HANDLE USER FILE UPLOADS ----------------
 def load_file_to_docs(file_path, ext):
-    if ext == "pdf":
-        return PyPDFLoader(file_path).load()
-    elif ext == "docx":
-        return UnstructuredWordDocumentLoader(file_path).load()
-    elif ext == "pptx":
-        prs = Presentation(file_path)
-        text = "\n".join(shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text"))
-        temp_txt = file_path + ".txt"
-        with open(temp_txt, "w", encoding="utf-8") as f:
-            f.write(text)
-        return TextLoader(temp_txt).load()
-    elif ext == "txt":
-        return TextLoader(file_path, encoding="utf-8").load()
-    elif ext == "md":
-        return UnstructuredMarkdownLoader(file_path).load()
-    return []
+    try:
+        if ext == "pdf":
+            return PyPDFLoader(file_path).load()
+        elif ext == "docx":
+            return UnstructuredWordDocumentLoader(file_path).load()
+        elif ext == "pptx":
+            prs = Presentation(file_path)
+            text = "\n".join(shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text"))
+            temp_txt = file_path + ".txt"
+            with open(temp_txt, "w", encoding="utf-8") as f:
+                f.write(text)
+            return TextLoader(temp_txt).load()
+        elif ext == "txt":
+            return TextLoader(file_path, encoding="utf-8").load()
+        elif ext == "md":
+            return UnstructuredMarkdownLoader(file_path).load()
+        return []
+    except Exception as e:
+        st.error(f"❌ Error loading file {file_path}: {str(e)}")
+        return []
 
 
 if uploaded_files:
     new_docs = []
     for f in uploaded_files:
         ext = f.name.split(".")[-1].lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
-            tmp.write(f.read())
-            tmp_path = tmp.name
-        new_docs.extend(load_file_to_docs(tmp_path, ext))
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
+                tmp.write(f.read())
+                tmp_path = tmp.name
+            
+            loaded_docs = load_file_to_docs(tmp_path, ext)
+            if loaded_docs:
+                new_docs.extend(loaded_docs)
+                st.success(f"✅ Successfully loaded {f.name}")
+            else:
+                st.warning(f"⚠️ No content extracted from {f.name}")
+                
+            # Clean up temporary file
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+                
+        except Exception as e:
+            st.error(f"❌ Error processing {f.name}: {str(e)}")
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    new_chunks = splitter.split_documents(new_docs)
-    embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    new_vs = FAISS.from_documents(new_chunks, embed)
-    vector_store.merge_from(new_vs)
+    # Only update vector store if we have new documents
+    if new_docs:
+        try:
+            splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+            new_chunks = splitter.split_documents(new_docs)
+            embed = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            new_vs = FAISS.from_documents(new_chunks, embed)
+            vector_store.merge_from(new_vs)
+            st.success(f"✅ Added {len(new_docs)} documents to knowledge base")
+        except Exception as e:
+            st.error(f"❌ Error updating vector store: {str(e)}")
 
 
 # ---------------- LLM + RETRIEVER ----------------
-retriever = vector_store.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
-)
+try:
+    retriever = vector_store.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5}
+    )
 
-llm = ChatTogether(
-    model="deepseek-ai/DeepSeek-V3",
-    temperature=0.2,
-    together_api_key=together_api_key
-)
+    # Check if Together API key is available
+    if not together_api_key:
+        st.error("❌ TOGETHER_API_KEY not found in environment variables. Please set it in your .env file.")
+        st.stop()
+
+    llm = ChatTogether(
+        model="deepseek-ai/DeepSeek-V3",
+        temperature=0.2,
+        together_api_key=together_api_key
+    )
+except Exception as e:
+    st.error(f"❌ Error initializing LLM or retriever: {str(e)}")
+    st.stop()
 
 
 # ---------------- CHAT HISTORY ----------------
@@ -143,7 +217,6 @@ if not st.session_state.greeted and not st.session_state.chat_history:
     st.markdown("<h2 style='text-align:center;'>👋 Hello TIETian! How can I help you today?</h2>", unsafe_allow_html=True)
 
 
-# ---------------- CHAT UI ----------------
 # ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
@@ -222,7 +295,6 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 st.session_state.chat_history.append({"role": "assistant", "message": error_response})
 
 
-# ---------------- EXPORT CHAT HISTORY ----------------
 # ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
