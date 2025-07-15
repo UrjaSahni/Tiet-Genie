@@ -23,49 +23,15 @@ together_api_key = os.getenv("TOGETHER_API_KEY")
 st.set_page_config(page_title="Tiet-Genie 🤖", layout="wide")
 
 
-def set_bg_with_overlay(image_path):
-    # Check if background image exists
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        st.markdown(f"""
-        <style>
-        .main > div:has(.block-container) {{
-            background: url("data:image/jpg;base64,{b64}") no-repeat center center fixed;
-            background-size: cover;
-            position: relative;
-        }}
-        .main > div:has(.block-container)::before {{
-            content: "";
-            background-color: rgba(255, 255, 255, 0.82);
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-        }}
-        .block-container {{
-            position: relative;
-            z-index: 1;
-        }}
-        .stChatMessageContent, .stMarkdown {{
-            color: #111 !important;
-            font-weight: 500;
-        }}
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        # Fallback styling if background image doesn't exist
-        st.markdown("""
-        <style>
-        .stChatMessageContent, .stMarkdown {
-            color: #111 !important;
-            font-weight: 500;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-
-set_bg_with_overlay("thaparbg.jpg")
+# Custom styling for better text visibility
+st.markdown("""
+<style>
+.stChatMessageContent, .stMarkdown {
+    color: #111 !important;
+    font-weight: 500;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
