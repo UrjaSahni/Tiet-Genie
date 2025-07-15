@@ -70,7 +70,7 @@ with st.sidebar:
 # ---------------- LOAD DEFAULT PDFs ----------------
 @st.cache_resource(show_spinner="Loading default PDFs...")
 def load_default_vectorstore():
-    default_files = ["rules.pdf", "Sequence Models-I.pdf"]
+    default_files = ["rules.pdf", "AcademicRegulations.pdf"]
     docs = []
     for path in default_files:
         docs.extend(PyPDFLoader(path).load())
