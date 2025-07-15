@@ -144,6 +144,7 @@ if not st.session_state.greeted and not st.session_state.chat_history:
 
 
 # ---------------- CHAT UI ----------------
+# ---------------- CHAT UI ----------------
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["message"], unsafe_allow_html=True)
@@ -176,13 +177,42 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
                 response_obj = llm.invoke(prompt_to_llm)
                 response = response_obj.content.strip() if hasattr(response_obj, "content") else str(response_obj).strip()
 
-                source_section = "\n\n---\n\n**📄 Source Snippets:**\n"
-                for i, doc in enumerate(retrieved_docs, 1):
-                    page = doc.metadata.get("page", "?")
-                    snippet = doc.page_content.strip().replace("\n", " ")[:300]
-                    source_section += f"- **Snippet {i} (Page {page})**: {snippet}\n"
+                # Check if the response indicates no relevant information found
+                no_info_indicators = [
+                    "do not contain specific information",
+                    "do not contain information",
+                    "does not contain specific information",
+                    "does not contain information",
+                    "do not address",
+                    "does not address",
+                    "do not discuss",
+                    "does not discuss",
+                    "no information about",
+                    "no specific information about",
+                    "not mentioned in the documents",
+                    "not found in the documents",
+                    "documents do not mention",
+                    "excerpts do not contain",
+                    "snippets do not contain",
+                    "provided documents do not"
+                ]
+                
+                # Check if response indicates no relevant information
+                response_lower = response.lower()
+                show_sources = not any(indicator in response_lower for indicator in no_info_indicators)
+                
+                if show_sources:
+                    # Show source snippets only if relevant information was found
+                    source_section = "\n\n---\n\n**📄 Source Snippets:**\n"
+                    for i, doc in enumerate(retrieved_docs, 1):
+                        page = doc.metadata.get("page", "?")
+                        snippet = doc.page_content.strip().replace("\n", " ")[:300]
+                        source_section += f"- **Snippet {i} (Page {page})**: {snippet}\n"
+                    final_response = f"{response}\n{source_section}"
+                else:
+                    # Don't show source snippets if no relevant information found
+                    final_response = response
 
-                final_response = f"{response}\n{source_section}"
                 st.markdown(final_response, unsafe_allow_html=True)
                 st.session_state.chat_history.append({"role": "assistant", "message": final_response})
 
