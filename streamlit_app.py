@@ -193,6 +193,7 @@ You are an AI assistant for Thapar Institute. Use the following document snippet
 
 
 # ---------------- EXPORT CHAT HISTORY ----------------
+# ---------------- EXPORT CHAT HISTORY ----------------
 def export_chat_history():
     chat = st.session_state.chat_history
     if not chat:
@@ -207,19 +208,28 @@ def export_chat_history():
         
         for msg in chat:
             role = "You" if msg["role"] == "user" else "Tiet-Genie"
-            # Clean message text to handle special characters
-            clean_message = msg['message'].encode('latin1', 'ignore').decode('latin1')
+            # Clean message text to handle special characters and remove markdown
+            clean_message = msg['message'].replace('**', '').replace('*', '').replace('#', '')
+            # Handle encoding issues
+            clean_message = clean_message.encode('latin1', 'ignore').decode('latin1')
             pdf.multi_cell(0, 10, f"{role}:\n{clean_message}\n")
 
-        # Output PDF to bytes
-        pdf_bytes = pdf.output(dest='S').encode('latin1')
+        # Output PDF to bytes - Fixed this part
+        pdf_output = pdf.output(dest='S')
+        if isinstance(pdf_output, str):
+            pdf_bytes = pdf_output.encode('latin1')
+        else:
+            pdf_bytes = pdf_output
+        
         pdf_buffer = io.BytesIO(pdf_bytes)
 
         # --- TXT Export ---
         txt_buffer = io.StringIO()
         for msg in chat:
             role = "You" if msg["role"] == "user" else "Tiet-Genie"
-            txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
+            # Clean markdown from text export too
+            clean_txt = msg['message'].replace('**', '').replace('*', '').replace('#', '')
+            txt_buffer.write(f"{role}:\n{clean_txt}\n\n")
         txt_buffer.seek(0)
 
         st.sidebar.markdown("### 📤 Export Chat History")
@@ -243,7 +253,9 @@ def export_chat_history():
             txt_buffer = io.StringIO()
             for msg in chat:
                 role = "You" if msg["role"] == "user" else "Tiet-Genie"
-                txt_buffer.write(f"{role}:\n{msg['message']}\n\n")
+                # Clean markdown from fallback text too
+                clean_txt = msg['message'].replace('**', '').replace('*', '').replace('#', '')
+                txt_buffer.write(f"{role}:\n{clean_txt}\n\n")
             txt_buffer.seek(0)
             
             st.sidebar.markdown("### 📤 Export Chat History")
