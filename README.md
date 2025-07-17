@@ -99,20 +99,4 @@ pytest
 
 ---
 
-## 📸 UI Preview
 
-> _Leave this section blank to paste your project UI screenshot._
-
----
-
-## 📩 Feedback & Contributions
-
-Feel free to open issues or submit pull requests to improve the project. Contributions are welcome!
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License.
-
----
